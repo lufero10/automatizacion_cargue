@@ -1,0 +1,69 @@
+{
+  "dcvg": {
+    "tipo": "complejo",
+    "inspection_type": "DCVG",
+    "datype": "Direct Current Voltage Gradient",
+    "tabla_principal": {
+      "nombre": "P_InspectionRange_1",
+      "campos": {
+        "ENGROUTEID": "ENGROUTEID",
+        "No Contrato": "CONTRACTNUMBER"
+      },
+      "agrupacion": ["ENGROUTEID", "No Contrato"],
+      "conversiones": {
+        "Alineación Centerline": {
+          "min": "ENGFROMM",
+          "max": "ENGTOM"
+        },
+        "Fecha de Inspección": {
+          "min": "INSPECTIONSTARTDATE",
+          "max": ["INSPECTIONENDDATE", "FROMDATE"]
+        }
+      }
+    },
+    "tabla_secundaria": {
+      "nombre": "P_DASurveyReadings_1",
+      "campos": {
+        "ENGROUTEID": "ENGROUTEID",
+        "Fecha de Inspección": "INSPECTIONDATE",
+        "ABCISA m": "FIELDM",
+        "Alineación Centerline": "ENGM",
+        "Latitud": "GPSY",
+        "Longitud": "GPSX",
+        "Altitud": "GPSZ",
+        "P On mV": "PSON",
+        "P Off mV": "PSOFF",
+        "P_RE mV": "PREMV",
+        "OL_RE mV": "OLREMV",
+        "PORC_IR": "IRPERCENT",
+        "Cama anódica temporal": "TEMPANODEBED",
+        "Profundidad Tuberia m": "DEPTH",
+        "Comentarios": "COMMENTS",
+        "Inicio _ Fin de Inspección": "Inicio_Fin_Inspec",
+        "carácter On_Off": "CARACTER_ON_OFF"
+      },
+      "conversiones": {
+        "CARACTER_ON_OFF": {
+          "separar_en": {
+            "CARON": { "posicion": 0, "mapa": { "A": 1, "C": 2 } },
+            "CAROFF": { "posicion": 1, "mapa": { "A": 1, "C": 2 } }
+          }
+        },
+        "SEVERITYCLA": {
+          "origen": "CLASIFICACION",
+          "mapa": {
+            "Muy Pequeño": 6,
+            "Pequeño": 1,
+            "Mediano": 2,
+            "Mediano-Grande": 3,
+            "Grande": 4
+          }
+        }
+      }
+    },
+    "reglas_generales": {
+      "campos_no_nulos": ["ENGROUTEID"],
+      "campos_no_negativos": ["ENGFROMM", "ENGTOM"]
+    }
+  }
+}
