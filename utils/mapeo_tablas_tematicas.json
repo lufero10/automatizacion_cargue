@@ -7,15 +7,15 @@
       "nombre": "P_InspectionRange_1",
       "campos": {
         "ENGROUTEID": "ENGROUTEID",
-        "No Contrato": "CONTRACTNUMBER"
+        "No_Contrato": "CONTRACTNUMBER"
       },
-      "agrupacion": ["ENGROUTEID", "No Contrato"],
+      "agrupacion": ["ENGROUTEID", "CONTRACTNUMBER"],
       "conversiones": {
-        "Alineación Centerline": {
+        "ENGM": {
           "min": "ENGFROMM",
           "max": "ENGTOM"
         },
-        "Fecha de Inspección": {
+        "Fecha_de_Inspección": {
           "min": "INSPECTIONSTARTDATE",
           "max": ["INSPECTIONENDDATE", "FROMDATE"]
         }
@@ -25,9 +25,9 @@
       "nombre": "P_DASurveyReadings_1",
       "campos": {
         "ENGROUTEID": "ENGROUTEID",
-        "Fecha de Inspección": "INSPECTIONDATE",
+        "Fecha_de_Inspección": "INSPECTIONDATE",
         "ABCISA m": "FIELDM",
-        "Alineación Centerline": "ENGM",
+        "ENGM": "ENGM",
         "Latitud": "GPSY",
         "Longitud": "GPSX",
         "Altitud": "GPSZ",
@@ -39,7 +39,7 @@
         "Cama anódica temporal": "TEMPANODEBED",
         "Profundidad Tuberia m": "DEPTH",
         "Comentarios": "COMMENTS",
-        "Inicio _ Fin de Inspección": "Inicio_Fin_Inspec",
+        "Inicio___Fin_de_Inspección": "Inicio_Fin_Inspec",
         "carácter On_Off": "CARACTER_ON_OFF"
       },
       "conversiones": {

@@ -10,7 +10,7 @@ def main():
     # Configuración general
     ruta_proyecto = r"D:\Requerimientos\TGI\AUTOMATIZACION_CARGUE_UPDM"
     ruta_excel = os.path.join(ruta_proyecto, "DCVG_PPM_T_LBBR_10_24_1300010947_551003090_TEL_Rev0.xlsx")
-    ruta_json = os.path.join(ruta_proyecto, "mapeo_tablas_tematicas.json")
+    ruta_json = os.path.join(ruta_proyecto, "utils/mapeo_tablas_tematicas.json")
 
     tematica = "dcvg"
     nombre_hoja = "DCVG"
@@ -29,13 +29,20 @@ def main():
     informe = generar_informe_validacion(df, mapeo, tematica)
 
     errores = []
+
     for campo, resultado in informe.items():
-        if resultado["estado"] != "OK":
-            errores.extend(resultado["faltantes"])
-            print(f"❌ Error en campo {campo}: faltan {resultado['faltantes']}")
+        if campo == "errores_adicionales":
+            if resultado:  # si hay errores adicionales
+                errores.extend(resultado)
+                for err in resultado:
+                    print(f"❌ {err}")
+        else:
+            if resultado["estado"] != "OK":
+                errores.extend(resultado["faltantes"] + resultado["errores_tipo"])
+                print(f"❌ Error en campo {campo}: faltan {resultado['faltantes']}, tipos {resultado['errores_tipo']}")
 
     if errores:
-        print("❌ Validación fallida. Revise los campos faltantes.")
+        print("❌ Validación fallida. Corrija los errores antes de continuar.")
         return
     else:
         print("✅ Validación exitosa. Continuando con el cargue...")
