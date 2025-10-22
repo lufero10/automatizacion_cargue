@@ -179,26 +179,26 @@ def cargue_bd(fc, mapeo_tematica, gdb_destino):
         Ruta completa del feature class de entrada (ej: scratch.gdb\COBERTURA_FC).
     mapeo_tematica : dict
         Configuración cargada desde el JSON para la temática.
+    gdb_destino : str
+        Ruta de la geodatabase donde se crearán o actualizarán las tablas destino.
     """
-    # ###############################
-    # import arcpy
-    # desc = arcpy.Describe(GDB_DESTINO)
-    # cp = desc.connectionProperties
-    # tipo_bd = desc.workspaceType
-    # nombre_bd = cp.database + ".DBO." if tipo_bd == "RemoteDatabase" else ""
-    # current_user = cp.user
-    # ################################
 
     print("🔎 Iniciando cargue a BD...")
-    print("📌 Feature class recibido:", fc)
-    print("📌 Contenido de mapeo_tematica:", mapeo_tematica)
+    print(f"📁 Feature class recibido: {fc}")
+    print(f"📘 Contenido del mapeo de la temática:\n{mapeo_tematica}")
 
+    # ==========================================================
+    # 🔸 Validación inicial del mapeo
+    # ==========================================================
     if mapeo_tematica is None:
         print("❌ No se encontró un mapeo para la temática proporcionada.")
         return
 
     tipo_tematica = mapeo_tematica.get("tipo", "sencillo")
 
+    # ==========================================================
+    # 🔸 Identificación de tablas y campos según tipo de temática
+    # ==========================================================
     if tipo_tematica == "complejo":
         # ✅ Tablas principales y secundarias
         nombre_tabla = mapeo_tematica.get("tabla_principal", {}).get("nombre", "")
@@ -210,60 +210,32 @@ def cargue_bd(fc, mapeo_tematica, gdb_destino):
         if nombre_tabla:
             print(f"✅ Nombre de la tabla principal: {nombre_tabla}")
         else:
-            print("⚠️ No se encontró el nombre de la tabla principal.")
+            print("⚠️ No se encontró el nombre de la tabla principal en el mapeo.")
 
         if nombre_tabla_secundaria:
             print(f"✅ Nombre de la tabla secundaria: {nombre_tabla_secundaria}")
         else:
-            print("⚠️ No se encontró el nombre de la tabla secundaria.")
+            print("⚠️ No se encontró el nombre de la tabla secundaria en el mapeo.")
 
-    else:  # caso sencillo
+    else:  # 🔹 Caso sencillo
         nombre_tabla = mapeo_tematica.get("tabla", "")
         campos = mapeo_tematica.get("campos", {})
         campos_secundarios = {}
 
         print(f"✅ Nombre de la tabla sencilla: {nombre_tabla}")
 
-    # ✅ Listado de campos obligatorios
+    # ==========================================================
+    # 🔸 Listado de campos obligatorios
+    # ==========================================================
     campos_obligatorios = list(campos.values())
-    print(f"📌 Campos obligatorios en tabla principal: {campos_obligatorios}")
+    print(f"📌 Campos obligatorios en tabla principal ({len(campos_obligatorios)}): {campos_obligatorios}")
 
     campos_obligatorios_secundarios = list(campos_secundarios.values()) if campos_secundarios else []
     if campos_obligatorios_secundarios:
-        print(f"📌 Campos obligatorios en tabla secundaria: {campos_obligatorios_secundarios}")
+        print(f"📌 Campos obligatorios en tabla secundaria ({len(campos_obligatorios_secundarios)}): {campos_obligatorios_secundarios}")
 
-    ##########################EVALUAR PERMANENCIA DE ESTA PARTE##################################
-    # Otros parámetros opcionales
-    campos_no_nulos = mapeo_tematica.get("campos_no_nulos", [])
-    campos_no_negativos = mapeo_tematica.get("campos_no_negativos", [])
-    abscisado_campos = mapeo_tematica.get("abscisado", [])
-    campos_adicionales = mapeo_tematica.get("campos_adicionales", [])
-    campos_filtros = mapeo_tematica.get("campos_filtros", [])
+    print("🧩 Estructura del mapeo validada correctamente.\n")
 
-    # Manejo del abscisado (inicial y final)
-    abscisado_inicial = abscisado_campos[0] if len(abscisado_campos) > 0 else None
-    abscisado_final = abscisado_campos[1] if len(abscisado_campos) > 1 else None
-
-    print(f'Campos no nulos: {campos_no_nulos}')
-    print(f'Campos no negativos: {campos_no_negativos}')
-    print(f'Campos adicionales: {campos_adicionales}')
-    print(f'Campos filtros: {campos_filtros}')
-    print(f'Abscisado inicial: {abscisado_inicial}')
-    print(f'Abscisado final: {abscisado_final}')
-    ###########################################################################################
-    # Obtener reglas del JSON
-    reglas_conversion = mapeo_tematica.get("tabla_principal", {}).get("conversiones", {})
-    # Obtener los campos de agrupación (puede ser None si no se especifica)
-    campos_agrupacion = mapeo_tematica.get("tabla_principal", {}).get("agrupacion", [])
-    #campos_agrupacion = ["ENGROUTEID", "No Contrato"]
-    # Si no hay agrupación definida, asignamos una lista vacía para evitar errores
-    if campos_agrupacion is None:
-        campos_agrupacion = []
-    print(f'Reglas de conversión: {reglas_conversion}')
-    print(f'Campos de agrupación: {campos_agrupacion}')
-
-    fecha_cargue = datetime.now().strftime("%Y-%m-%d %H:%M")
-    print(f"Esta es la fecha de cargue:{fecha_cargue}")
 
     # -------------------------------------------------------------
     # 🔹 Cargar el feature class en un DataFrame de pandas
@@ -302,7 +274,9 @@ def cargue_bd(fc, mapeo_tematica, gdb_destino):
         else:
             print(f"⚠️ La columna {col} NO existe en el DataFrame")
 
-    df = aplicar_reglas_conversion(df, reglas_conversion, campos_agrupacion)
+    # Aplicar reglas específicas de la temática
+    from utils.reglas.dcvg_reglas import aplicar_reglas_dcvg
+    df = aplicar_reglas_dcvg(df)
 
     # Adición columnas para cargue
     df['FECHA_CARGUE'] = fecha_cargue

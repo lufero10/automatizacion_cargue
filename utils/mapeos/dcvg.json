@@ -1,0 +1,31 @@
+{
+  "tipo": "complejo",
+  "inspection_type": "DCVG",
+  "datype": "Direct Current Voltage Gradient",
+  "tabla_principal": {
+    "nombre": "P_InspectionRange_1",
+    "campos": {
+      "ENGROUTEID": "ENGROUTEID",
+      "No_Contrato": "CONTRACTNUMBER"
+    }
+  },
+  "tabla_secundaria": {
+    "nombre": "P_DASurveyReadings_1",
+    "campos": {
+      "ENGROUTEID": "ENGROUTEID",
+      "Fecha_de_Inspección": "INSPECTIONDATE",
+      "ABCISA m": "FIELDM",
+      "Latitud": "GPSY",
+      "Longitud": "GPSX",
+      "Altitud": "GPSZ",
+      "P On mV": "PSON",
+      "P Off mV": "PSOFF",
+      "P_RE mV": "PREMV",
+      "OL_RE mV": "OLREMV",
+      "PORC_IR": "IRPERCENT",
+      "Cama anódica temporal": "TEMPANODEBED",
+      "Profundidad Tuberia m": "DEPTH",
+      "Comentarios": "COMMENTS"
+    }
+  }
+}
