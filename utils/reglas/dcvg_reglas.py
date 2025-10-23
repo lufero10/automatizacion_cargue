@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from datetime import datetime
 
 def aplicar_reglas_dcvg(df):
     """
@@ -85,6 +86,19 @@ def aplicar_reglas_dcvg(df):
     df_agg['DATYPE'] = "Direct Current Voltage Gradient"
 
     return df_agg
+
+def reglas_dcvg_secundario(df_secundario, CURRENT_USER, mapeo_tematica):
+    """Aplica las reglas específicas para la tabla secundaria de DCVG."""
+    fecha_cargue = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    df_secundario['FECHA_CARGUE'] = fecha_cargue
+    df_secundario['CREATIONDATE'] = fecha_cargue
+    df_secundario['LASTUPDATE'] = fecha_cargue
+    df_secundario['CREATOR'] = CURRENT_USER
+    df_secundario['UPDATEDBY'] = CURRENT_USER
+    df_secundario['DATYPE'] = mapeo_tematica.get("datype", "")
+
+    return df_secundario
 def aplicar_reglas_conversiones(df):
     """Aplica conversiones específicas para DCVG."""
     # Conversión de ENGM → ENGFROMM / ENGTOM

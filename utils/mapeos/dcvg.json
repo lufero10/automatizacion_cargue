@@ -13,6 +13,7 @@
     "nombre": "P_DASurveyReadings_1",
     "campos": {
       "ENGROUTEID": "ENGROUTEID",
+      "No_Contrato": "CONTRACTNUMBER",
       "Fecha_de_Inspección": "INSPECTIONDATE",
       "ABCISA m": "FIELDM",
       "Latitud": "GPSY",

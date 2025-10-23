@@ -8,6 +8,7 @@ from utils.espacializaciontematica import espacializacion
 
 # Importar reglas por temática
 from utils.reglas.dcvg_reglas import aplicar_reglas_dcvg
+from utils.reglas.dcvg_reglas import reglas_dcvg_secundario
 
 
 
@@ -159,6 +160,61 @@ def cargar_df_a_tabla(df, gdb_destino, nombre_tabla):
 
     print(f"✅ Tabla '{nombre_tabla}' creada y cargada correctamente.")
 
+def asignar_globalid(df_secundario, cobdestino, inspection_type_json):
+    """
+    Asigna el GLOBALID desde el feature class principal a la tabla secundaria
+    usando ENGROUTEID, CONTRACTNUMBER y la fecha de cargue.
+
+    Parámetros:
+        df_secundario (pd.DataFrame): DataFrame de la tabla secundaria.
+        cobdestino (str): Ruta del feature class principal en la GDB.
+        inspection_type_json (str): Tipo de inspección a filtrar (Ej. "dcvg").
+
+    Retorna:
+        pd.DataFrame: DataFrame secundario con INSPECTIONRANGE_GlobalID asignado.
+    """
+
+    # 📅 Fecha de cargue (formato YYYY-MM-DD)
+    fecha_cargue = datetime.now().strftime("%Y-%m-%d")
+
+    # 🎯 Campos a extraer
+    fields = ["GLOBALID", "ENGROUTEID", "CONTRACTNUMBER", "CREATIONDATE", "INSPECTIONTYPE"]
+
+    # 📥 Extraer datos filtrados del feature class
+    data_fc = [
+        row for row in arcpy.da.SearchCursor(cobdestino, fields)
+        if row[4].strip().upper() == inspection_type_json.strip().upper() and row[3].strftime("%Y-%m-%d") == fecha_cargue
+    ]
+
+    print(f"🔍 Registros extraídos de {cobdestino}: {len(data_fc)}")
+
+    # Si no hay registros, retornar el DataFrame sin modificaciones
+    if not data_fc:
+        print("⚠️ No se encontraron registros en la fecha de cargue.")
+        return df_secundario
+
+    # Convertir a DataFrame y renombrar GLOBALID
+    df_fc = pd.DataFrame(data_fc, columns=fields)[["GLOBALID", "ENGROUTEID", "CONTRACTNUMBER"]]
+    df_fc = df_fc.rename(columns={"GLOBALID": "INSPECTIONRANGE_GlobalID"})
+
+    # 🔄 Asegurar que los tipos de datos sean iguales antes del merge
+    df_secundario["ENGROUTEID"] = df_secundario["ENGROUTEID"].astype(str)
+    df_secundario["CONTRACTNUMBER"] = df_secundario["CONTRACTNUMBER"].astype(str)
+    df_fc["ENGROUTEID"] = df_fc["ENGROUTEID"].astype(str)
+    df_fc["CONTRACTNUMBER"] = df_fc["CONTRACTNUMBER"].astype(str)
+
+    # 🔄 Asignar `INSPECTIONRANGE_GlobalID` a la tabla secundaria
+    df_secundario = df_secundario.merge(df_fc, on=["ENGROUTEID", "CONTRACTNUMBER"], how="left")
+
+    # 🛠️ Validar si hay registros sin `INSPECTIONRANGE_GlobalID`
+    missing_globalid = df_secundario["INSPECTIONRANGE_GlobalID"].isna().sum()
+    if missing_globalid:
+        print(f"⚠️ {missing_globalid} registros en la tabla secundaria no tienen INSPECTIONRANGE_GlobalID asignado.")
+    else:
+        print("✅ INSPECTIONRANGE_GlobalID asignado correctamente.")
+
+    return df_secundario
+
 # Diccionario para seleccionar la función de reglas según temática
 REGLAS_TEMATICA = {
     "dcvg": aplicar_reglas_dcvg
@@ -170,17 +226,6 @@ def cargue_bd(fc, tematica, mapeo_tematica, gdb_destino):
     """
     Carga información desde un feature class a la tabla destino
     aplicando las reglas específicas según la temática.
-
-    Parámetros:
-    -----------
-    fc : str
-        Ruta completa del feature class de entrada.
-    tematica : str
-        Nombre de la temática (ej: "dcvg").
-    mapeo_tematica : dict
-        Configuración de la temática (campos, tablas, etc.).
-    gdb_destino : str
-        Ruta de la geodatabase destino.
     """
 
     print("🔎 Iniciando cargue a BD...")
@@ -193,15 +238,18 @@ def cargue_bd(fc, tematica, mapeo_tematica, gdb_destino):
 
     tipo_tematica = mapeo_tematica.get("tipo", "sencillo")
 
-    # Determinar tablas y campos
+    # ================================================================
+    # 1️⃣ PROCESO TABLA PRINCIPAL
+    # ================================================================
     if tipo_tematica == "complejo":
-        nombre_tabla = mapeo_tematica.get("tabla_principal", {}).get("nombre", "")
-        campos = mapeo_tematica.get("tabla_principal", {}).get("campos", {})
+        tabla_principal = mapeo_tematica.get("tabla_principal", {})
+        nombre_tabla = tabla_principal.get("nombre", "")
+        campos = tabla_principal.get("campos", {})
     else:
         nombre_tabla = mapeo_tematica.get("tabla", "")
         campos = mapeo_tematica.get("campos", {})
 
-    # Cargar FC en DataFrame
+    # Cargar Feature Class en DataFrame
     try:
         campos_fc = [f.name for f in arcpy.ListFields(fc)]
         data = [row for row in arcpy.da.SearchCursor(fc, campos_fc)]
@@ -221,45 +269,93 @@ def cargue_bd(fc, tematica, mapeo_tematica, gdb_destino):
     else:
         print(f"⚠️ No se encontró función de reglas para la temática '{tematica}'")
 
-    # Mostrar resumen
-    print("########## DF final ##########")
-    print(df.columns.tolist())
-    print(df.head())
-
     # Cargar DataFrame a la tabla de destino
     cargar_df_a_tabla(df, gdb_destino, nombre_tabla)
 
-    # Espacialización y cargue
-
-    ###############################
-    GDB_UPDM = f"D:\Requerimientos\TGI\AUTOMATIZACION_CARGUE_UPDM\sde\TGI_UPDM.sde"
+    # ================================================================
+    # 2️⃣ ESPACIALIZACIÓN DE TABLA PRINCIPAL
+    # ================================================================
+    GDB_UPDM = r"D:\Requerimientos\TGI\AUTOMATIZACION_CARGUE_UPDM\sde\TGI_UPDM.sde"
     DESC = arcpy.Describe(GDB_UPDM)
     CP = DESC.connectionProperties
     TIPO_DB = DESC.workspaceType
     NOMBRE_DB = CP.database + ".DBO." if TIPO_DB == "RemoteDatabase" else ""
     CURRENT_USER = CP.user
-    ################################
 
-    ##########################################################################################################
-    # Definir los parámetros
-    #nombre_tabla = mapeo_tematica.get("tabla", "")
-    nombre_tabla = 'P_InspectionRange_1'
-    print(f"Nombre tablas: {nombre_tabla}")
-    ft = os.path.join(gdb_destino, nombre_tabla)
-    print(f"ft:{ft}")
+    nombre_tabla_fc = 'P_InspectionRange_1'
+    ft = os.path.join(gdb_destino, nombre_tabla_fc)
     campo_engrid = 'ENGROUTEID'
-    out_fc = os.path.join(gdb_destino, f"{nombre_tabla}_Espacializada")
-    print(f"out_fc: {out_fc}")
+    out_fc = os.path.join(gdb_destino, f"{nombre_tabla_fc}_Espacializada")
     centerline = os.path.join(gdb_destino, "P_centerline")
-    print(centerline)
     campo_routeid = 'ENGROUTEID'
     tipo_dato = 'Linea Abscisado'
-    #tipo_dato = 'Coordenadas XYZ'
     sr = 'GEOGCS["GCS_MAGNA",DATUM["D_MAGNA",SPHEROID["GRS_1980",6378137.0,298.257222101]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]];-400 -400 1000000000;-100000 10000;-100000 1000;8.98315284119521E-09;0.001;0.002;IsHighPrecision'
-    cobdestino = os.path.join(GDB_UPDM, f"{NOMBRE_DB}P_Integrity", nombre_tabla)
-    print(f"Cobertura de destino: {cobdestino}")
-    ###############################################################################################################################
+    cobdestino = os.path.join(GDB_UPDM, f"{NOMBRE_DB}P_Integrity", nombre_tabla_fc)
+
     espacializacion(ft, campo_engrid, out_fc, centerline, campo_routeid, tipo_dato, sr, cobdestino)
+
+    # ================================================================
+    # 3️⃣ PROCESO TABLA SECUNDARIA (si existe en el JSON)
+    # ================================================================
+    if "tabla_secundaria" in mapeo_tematica:
+        print("🔄 Procesando tabla secundaria...")
+
+        tabla_secundaria = mapeo_tematica["tabla_secundaria"]
+        nombre_tabla_sec = tabla_secundaria.get("nombre", "")
+        campos_sec = tabla_secundaria.get("campos", {})
+
+        # Cargar nuevamente el feature class (puede ajustarse a otra fuente)
+        try:
+            campos_fc_sec = [f.name for f in arcpy.ListFields(fc)]
+            data_sec = [row for row in arcpy.da.SearchCursor(fc, campos_fc_sec)]
+            df_secundario = pd.DataFrame(data_sec, columns=campos_fc_sec)
+            print(f"📊 Total de registros para tabla secundaria: {len(df_secundario)}")
+        except Exception as e:
+            arcpy.AddError(f"Error al cargar el feature class secundario: {e}")
+            return
+
+        # Renombrar columnas según mapeo
+        df_secundario.rename(columns=campos_sec, inplace=True)
+
+        # 🔸 Aplicar reglas específicas de DCVG secundario
+        df_secundario = reglas_dcvg_secundario(df_secundario, CURRENT_USER, mapeo_tematica)
+
+        # Asignar GLOBALID desde tabla principal
+        inspection_type_json = mapeo_tematica.get("inspection_type", "DCVG")
+        df_secundario = asignar_globalid(df_secundario, cobdestino, inspection_type_json)
+
+        # Cargar la tabla secundaria en la GDB
+        cargar_df_a_tabla(df_secundario, gdb_destino, nombre_tabla_sec)
+
+        print(f"✅ Tabla secundaria '{nombre_tabla_sec}' cargada correctamente con referencia al GLOBALID.")
+
+    else:
+        print("ℹ️ No se definió tabla secundaria en el JSON. Proceso finalizado.")
+
+    # ================================================================
+    # ESPACIALIZACIÓN DE TABLA SECUNDARIA
+    # ================================================================
+    GDB_UPDM = r"D:\Requerimientos\TGI\AUTOMATIZACION_CARGUE_UPDM\sde\TGI_UPDM.sde"
+    DESC = arcpy.Describe(GDB_UPDM)
+    CP = DESC.connectionProperties
+    TIPO_DB = DESC.workspaceType
+    NOMBRE_DB = CP.database + ".DBO." if TIPO_DB == "RemoteDatabase" else ""
+    CURRENT_USER = CP.user
+
+    nombre_tabla_fc = 'P_DASurveyReadings_1'
+    ft = os.path.join(gdb_destino, nombre_tabla_fc)
+    campo_engrid = 'ENGROUTEID'
+    out_fc = os.path.join(gdb_destino, f"{nombre_tabla_fc}_Espacializada")
+    centerline = os.path.join(gdb_destino, "P_centerline")
+    campo_routeid = 'ENGROUTEID'
+    tipo_dato = 'Coordenadas XYZ'
+    sr = 'GEOGCS["GCS_MAGNA",DATUM["D_MAGNA",SPHEROID["GRS_1980",6378137.0,298.257222101]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]];-400 -400 1000000000;-100000 10000;-100000 1000;8.98315284119521E-09;0.001;0.002;IsHighPrecision'
+    cobdestino = os.path.join(GDB_UPDM, f"{NOMBRE_DB}P_Integrity", nombre_tabla_fc)
+
+    espacializacion(ft, campo_engrid, out_fc, centerline, campo_routeid, tipo_dato, sr, cobdestino)
+
+
+    print("🏁 Cargue completo.")
 
 
 
