@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 import pandas as pd
 import numpy as np
+from utils.espacializaciontematica import espacializacion
 
 # Importar reglas por temática
 from utils.reglas.dcvg_reglas import aplicar_reglas_dcvg
@@ -227,6 +228,38 @@ def cargue_bd(fc, tematica, mapeo_tematica, gdb_destino):
 
     # Cargar DataFrame a la tabla de destino
     cargar_df_a_tabla(df, gdb_destino, nombre_tabla)
+
+    # Espacialización y cargue
+
+    ###############################
+    GDB_UPDM = f"D:\Requerimientos\TGI\AUTOMATIZACION_CARGUE_UPDM\sde\TGI_UPDM.sde"
+    DESC = arcpy.Describe(GDB_UPDM)
+    CP = DESC.connectionProperties
+    TIPO_DB = DESC.workspaceType
+    NOMBRE_DB = CP.database + ".DBO." if TIPO_DB == "RemoteDatabase" else ""
+    CURRENT_USER = CP.user
+    ################################
+
+    ##########################################################################################################
+    # Definir los parámetros
+    #nombre_tabla = mapeo_tematica.get("tabla", "")
+    nombre_tabla = 'P_InspectionRange_1'
+    print(f"Nombre tablas: {nombre_tabla}")
+    ft = os.path.join(gdb_destino, nombre_tabla)
+    print(f"ft:{ft}")
+    campo_engrid = 'ENGROUTEID'
+    out_fc = os.path.join(gdb_destino, f"{nombre_tabla}_Espacializada")
+    print(f"out_fc: {out_fc}")
+    centerline = os.path.join(gdb_destino, "P_centerline")
+    print(centerline)
+    campo_routeid = 'ENGROUTEID'
+    tipo_dato = 'Linea Abscisado'
+    #tipo_dato = 'Coordenadas XYZ'
+    sr = 'GEOGCS["GCS_MAGNA",DATUM["D_MAGNA",SPHEROID["GRS_1980",6378137.0,298.257222101]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]];-400 -400 1000000000;-100000 10000;-100000 1000;8.98315284119521E-09;0.001;0.002;IsHighPrecision'
+    cobdestino = os.path.join(GDB_UPDM, f"{NOMBRE_DB}P_Integrity", nombre_tabla)
+    print(f"Cobertura de destino: {cobdestino}")
+    ###############################################################################################################################
+    espacializacion(ft, campo_engrid, out_fc, centerline, campo_routeid, tipo_dato, sr, cobdestino)
 
 
 

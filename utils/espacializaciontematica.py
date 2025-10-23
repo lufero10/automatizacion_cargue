@@ -109,10 +109,14 @@ def espacializacion(ft, campo_engrid, out_fc, centerline, campo_routeid, tipo_da
         arcpy.TableSelect_analysis(out_tb, out_fc)
 
 
+    gdb_destino = r"D:\Requerimientos\TGI\AUTOMATIZACION_CARGUE_UPDM\sde\TGI_UPDM.sde"
+    arcpy.AddMessage(f"Verificando acceso a SDE: {gdb_destino}... {datetime.datetime.now()}")
+
+
     try:
         # Iniciar sesión de edición en la versión correcta
         #gdb_destino = os.path.join(os.path.dirname(__file__), 'sde', 'UPDM_TGI.sde')
-        gdb_destino = os.path.join(os.path.dirname(__file__), 'sde', 'PRUEBAS_UPDM_TGI.sde')
+        #gdb_destino = os.path.join(os.path.dirname(__file__), 'sde', 'TGI_UPDM.sde')
         arcpy.AddMessage(f"Iniciando sesión de edición en {gdb_destino}... {datetime.datetime.now()}")
 
         edit = arcpy.da.Editor(gdb_destino)

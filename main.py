@@ -27,38 +27,38 @@ def main():
     cobertura_name = "COBERTURA_FC"
 
     # # --- 1️⃣ CARGAR MAPEO ---
-    # print("📘 [1/6] Cargando mapeo de temática...")
+    print("📘 [1/6] Cargando mapeo de temática...")
     mapeo_tematica = cargar_mapeo_tematica(ruta_proyecto, tematica)
-    # print("✅ Mapeo cargado correctamente.\n")
-    #
-    # # --- 2️⃣ VALIDACIÓN DEL EXCEL ---
-    # print("📊 [2/6] Validando estructura del archivo Excel...")
-    # df = pd.read_excel(ruta_excel, sheet_name=nombre_hoja)
-    # informe = generar_informe_validacion(df, mapeo_tematica)
-    # print("✅ Validación completada.\n")
-    #
-    # print("📘 MAPEO DETECTADO:")
-    # pprint.pprint(mapeo_tematica)
-    # print("\n📋 INFORME DE VALIDACIÓN:")
-    # pprint.pprint(informe)
-    # print()
-    #
-    # # --- 3️⃣ CARGA DEL EXCEL COMO FEATURE CLASS ---
-    # print("📥 [3/6] Cargando archivo Excel a GDB y generando feature class...")
-    # cobertura_fc = cargar_excel_a_gdb(ruta_excel, nombre_hoja, outLocation, cobertura_name, inputGeom)
-    # print(f"cobertura_fc: {cobertura_fc}")
-    #
-    # if not arcpy.Exists(cobertura_fc):
-    #     raise RuntimeError("❌ No se generó la cobertura. Verifica el cargue del Excel.")
-    # print(f"✅ Feature class creada correctamente: {cobertura_fc}\n")
-    #
-    # # --- 4️⃣ ALINEACIÓN CON CENTERLINE ---
-    # print("📐 [4/6] Ejecutando alineación con el Centerline...")
-    # if not arcpy.Exists(route):
-    #     raise FileNotFoundError(f"❌ No se encontró la ruta del Centerline: {route}")
-    #
-    # alineacion(cobertura_fc, route, tolerancia)
-    # print("✅ Alineación completada correctamente.\n")
+    print("✅ Mapeo cargado correctamente.\n")
+
+    # --- 2️⃣ VALIDACIÓN DEL EXCEL ---
+    print("📊 [2/6] Validando estructura del archivo Excel...")
+    df = pd.read_excel(ruta_excel, sheet_name=nombre_hoja)
+    informe = generar_informe_validacion(df, mapeo_tematica)
+    print("✅ Validación completada.\n")
+
+    print("📘 MAPEO DETECTADO:")
+    pprint.pprint(mapeo_tematica)
+    print("\n📋 INFORME DE VALIDACIÓN:")
+    pprint.pprint(informe)
+    print()
+
+    # --- 3️⃣ CARGA DEL EXCEL COMO FEATURE CLASS ---
+    print("📥 [3/6] Cargando archivo Excel a GDB y generando feature class...")
+    cobertura_fc = cargar_excel_a_gdb(ruta_excel, nombre_hoja, outLocation, cobertura_name, inputGeom)
+    print(f"cobertura_fc: {cobertura_fc}")
+
+    if not arcpy.Exists(cobertura_fc):
+        raise RuntimeError("❌ No se generó la cobertura. Verifica el cargue del Excel.")
+    print(f"✅ Feature class creada correctamente: {cobertura_fc}\n")
+
+    # --- 4️⃣ ALINEACIÓN CON CENTERLINE ---
+    print("📐 [4/6] Ejecutando alineación con el Centerline...")
+    if not arcpy.Exists(route):
+        raise FileNotFoundError(f"❌ No se encontró la ruta del Centerline: {route}")
+
+    alineacion(cobertura_fc, route, tolerancia)
+    print("✅ Alineación completada correctamente.\n")
 
     # --- 5️⃣ CARGUE A BASE DE DATOS ---
     print("💾 [5/6] Iniciando cargue a base de datos destino...")
