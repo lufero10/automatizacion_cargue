@@ -7,13 +7,89 @@ import numpy as np
 from utils.espacializaciontematica import espacializacion
 
 # Importar reglas por temática
-from utils.reglas.dcvg_reglas import aplicar_reglas_dcvg, reglas_dcvg_secundario
+from utils.reglas.dcvg_reglas import aplicar_reglas_dcvg
+from utils.reglas.dcvg_reglas import reglas_dcvg_secundario
 
-# -------------------------------------------------------------------
-# 🗂️ Geodatabase temporal de trabajo
-# -------------------------------------------------------------------
-GDB_DESTINO = arcpy.env.scratchGDB
-print(f"⚙️  Geodatabase temporal establecida: {GDB_DESTINO}")
+
+
+# BASE_DIR = os.path.dirname(__file__)
+# PROJECT_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))  # sube un nivel desde utils
+# GDB_DESTINO = os.path.join(PROJECT_DIR, "sde", "TGI_UPDM.sde")
+
+GDB_DESTINO = r'D:\Requerimientos\TGI\AUTOMATIZACION_CARGUE_UPDM\Centerline.gdb'
+
+#
+# print("GDB_DESTINO:", GDB_DESTINO)
+# desc = arcpy.Describe(GDB_DESTINO)
+# print("workspaceType:", desc.workspaceType)
+
+def cargar_json(ruta_json):
+    try:
+        with open(ruta_json, 'r', encoding='utf-8') as archivo:
+            mapeo = json.load(archivo)
+        return mapeo
+    except Exception as e:
+        arcpy.AddError(f"Error al cargar el mapeo desde el archivo JSON: {e}")
+        return None
+
+def obtener_mapeo_tematica(tematica, mapeo):
+    return mapeo.get(tematica.lower(), None)
+
+def aplicar_reglas_conversion(df, reglas_conversion, campos_agrupacion=None, mapeo_tematica=None):
+    if not reglas_conversion:
+        return df
+
+    # Aseguramos que agrupación solo tenga columnas válidas
+    if campos_agrupacion:
+        campos_agrupacion = [c for c in campos_agrupacion if c in df.columns]
+
+    reglas_agg = {}
+    duplicados = {}
+
+    # Construcción de reglas
+    for columna, operaciones in reglas_conversion.items():
+        # Verificar que la columna exista en df
+        if columna not in df.columns:
+            print(f"⚠️ Columna '{columna}' no encontrada en DF. Se omite.")
+            continue
+
+        for operacion, nombres_salida in operaciones.items():
+            if not isinstance(nombres_salida, list):
+                nombres_salida = [nombres_salida]
+
+            nombre_principal = nombres_salida[0]
+            reglas_agg.setdefault(columna, {})[operacion] = nombre_principal
+
+            if len(nombres_salida) > 1:
+                duplicados[nombre_principal] = nombres_salida[1:]
+
+    if not reglas_agg:
+        print("⚠️ No se construyeron reglas de conversión válidas.")
+        return df
+
+    # Transformar en formato válido para agg()
+    reglas_pandas = {col: list(ops.keys()) for col, ops in reglas_agg.items()}
+
+    # Ejecutar la agregación
+    if campos_agrupacion:
+        df_agg = df.groupby(campos_agrupacion).agg(reglas_pandas).reset_index()
+    else:
+        df_agg = df.agg(reglas_pandas).to_frame().T  # una sola fila
+
+    # Aplanar columnas MultiIndex
+    df_agg.columns = ['_'.join(col).strip('_') if isinstance(col, tuple) else col for col in df_agg.columns]
+
+    # Renombrar columnas según reglas
+    renombres = {f"{col}_{op}": nuevo for col, ops in reglas_agg.items() for op, nuevo in ops.items()}
+    df_agg = df_agg.rename(columns=renombres)
+
+    # Duplicar columnas
+    for col_origen, nuevas in duplicados.items():
+        if col_origen in df_agg.columns:
+            for nueva in nuevas:
+                df_agg[nueva] = df_agg[col_origen]
+
+    return df_agg
 
 def detectar_tipo_dato_arcgis(tipo_pandas):
     """
@@ -27,11 +103,10 @@ def detectar_tipo_dato_arcgis(tipo_pandas):
         return "SHORT"
     elif pd.api.types.is_datetime64_any_dtype(tipo_pandas):
         return "DATE"
-    elif pd.api.types.is_object_dtype(tipo_pandas):
-        return "TEXT"
     else:
-        # Fallback: por seguridad, usar texto
+        # Valor por defecto para texto
         return "TEXT"
+
 
 
 def cargar_df_a_tabla(df, gdb_destino, nombre_tabla):
@@ -85,43 +160,60 @@ def cargar_df_a_tabla(df, gdb_destino, nombre_tabla):
 
     print(f"✅ Tabla '{nombre_tabla}' creada y cargada correctamente.")
 
-def asignar_globalid(df_secundario, cobdestino, inspection_type_json, fecha_cargue=None):
+def asignar_globalid(df_secundario, cobdestino, inspection_type_json):
     """
     Asigna el GLOBALID desde el feature class principal a la tabla secundaria
     usando ENGROUTEID, CONTRACTNUMBER y la fecha de cargue.
-    """
-    if fecha_cargue is None:
-        fecha_cargue = datetime.now().strftime("%Y-%m-%d")
 
+    Parámetros:
+        df_secundario (pd.DataFrame): DataFrame de la tabla secundaria.
+        cobdestino (str): Ruta del feature class principal en la GDB.
+        inspection_type_json (str): Tipo de inspección a filtrar (Ej. "dcvg").
+
+    Retorna:
+        pd.DataFrame: DataFrame secundario con INSPECTIONRANGE_GlobalID asignado.
+    """
+
+    # 📅 Fecha de cargue (formato YYYY-MM-DD)
+    fecha_cargue = datetime.now().strftime("%Y-%m-%d")
+
+    # 🎯 Campos a extraer
     fields = ["GLOBALID", "ENGROUTEID", "CONTRACTNUMBER", "CREATIONDATE", "INSPECTIONTYPE"]
 
-    print(f"📄 Asignando INSPECTIONRANGE_GlobalID desde {os.path.basename(cobdestino)}...")
+    # 📥 Extraer datos filtrados del feature class
+    data_fc = [
+        row for row in arcpy.da.SearchCursor(cobdestino, fields)
+        if row[4].strip().upper() == inspection_type_json.strip().upper() and row[3].strftime("%Y-%m-%d") == fecha_cargue
+    ]
 
-    try:
-        data_fc = [row for row in arcpy.da.SearchCursor(cobdestino, fields)]
-        df_fc = pd.DataFrame(data_fc, columns=fields)
+    print(f"🔍 Registros extraídos de {cobdestino}: {len(data_fc)}")
 
-        df_fc = df_fc[
-            (df_fc["INSPECTIONTYPE"].str.upper() == inspection_type_json.strip().upper()) &
-            (df_fc["CREATIONDATE"].dt.strftime("%Y-%m-%d") == fecha_cargue)
-        ][["GLOBALID", "ENGROUTEID", "CONTRACTNUMBER"]]
+    # Si no hay registros, retornar el DataFrame sin modificaciones
+    if not data_fc:
+        print("⚠️ No se encontraron registros en la fecha de cargue.")
+        return df_secundario
 
-        df_fc = df_fc.rename(columns={"GLOBALID": "INSPECTIONRANGE_GlobalID"})
+    # Convertir a DataFrame y renombrar GLOBALID
+    df_fc = pd.DataFrame(data_fc, columns=fields)[["GLOBALID", "ENGROUTEID", "CONTRACTNUMBER"]]
+    df_fc = df_fc.rename(columns={"GLOBALID": "INSPECTIONRANGE_GlobalID"})
 
-        for col in ["ENGROUTEID", "CONTRACTNUMBER"]:
-            df_fc[col] = df_fc[col].astype(str)
-            df_secundario[col] = df_secundario[col].astype(str)
+    # 🔄 Asegurar que los tipos de datos sean iguales antes del merge
+    df_secundario["ENGROUTEID"] = df_secundario["ENGROUTEID"].astype(str)
+    df_secundario["CONTRACTNUMBER"] = df_secundario["CONTRACTNUMBER"].astype(str)
+    df_fc["ENGROUTEID"] = df_fc["ENGROUTEID"].astype(str)
+    df_fc["CONTRACTNUMBER"] = df_fc["CONTRACTNUMBER"].astype(str)
 
-        df_secundario = df_secundario.merge(df_fc, on=["ENGROUTEID", "CONTRACTNUMBER"], how="left")
+    # 🔄 Asignar `INSPECTIONRANGE_GlobalID` a la tabla secundaria
+    df_secundario = df_secundario.merge(df_fc, on=["ENGROUTEID", "CONTRACTNUMBER"], how="left")
 
-        missing = df_secundario["INSPECTIONRANGE_GlobalID"].isna().sum()
-        print(f"✅ INSPECTIONRANGE_GlobalID asignado. Registros sin asignar: {missing}")
-
-    except Exception as e:
-        print(f"❌ Error al asignar GLOBALID: {e}")
+    # 🛠️ Validar si hay registros sin `INSPECTIONRANGE_GlobalID`
+    missing_globalid = df_secundario["INSPECTIONRANGE_GlobalID"].isna().sum()
+    if missing_globalid:
+        print(f"⚠️ {missing_globalid} registros en la tabla secundaria no tienen INSPECTIONRANGE_GlobalID asignado.")
+    else:
+        print("✅ INSPECTIONRANGE_GlobalID asignado correctamente.")
 
     return df_secundario
-
 
 # Diccionario para seleccionar la función de reglas según temática
 REGLAS_TEMATICA = {

@@ -1,26 +1,54 @@
 import json
 import pandas as pd
 import os
+import arcpy
 
 
-def cargar_mapeo_tematica(ruta_base, tematica):
+# def cargar_mapeo_tematica(ruta_base, tematica):
+#     """
+#     Carga el archivo JSON de mapeo específico para la temática indicada.
+#
+#     Args:
+#         ruta_base (str): Ruta base del proyecto (por ejemplo, D:\Requerimientos\TGI\AUTOMATIZACION_CARGUE_UPDM)
+#         tematica (str): Nombre de la temática, p. ej. 'dcvg'
+#
+#     Returns:
+#         dict: Contenido del archivo JSON correspondiente
+#     """
+#     ruta_json = os.path.join(ruta_base, "utils", "mapeos", f"{tematica}.json")
+#
+#     if not os.path.exists(ruta_json):
+#         raise FileNotFoundError(f"No se encontró el archivo JSON en: {ruta_json}")
+#
+#     with open(ruta_json, "r", encoding="utf-8") as archivo:
+#         return json.load(archivo)
+def cargar_mapeo_tematica(tematica):
     """
-    Carga el archivo JSON de mapeo específico para la temática indicada.
+    Carga el archivo JSON de mapeo correspondiente a la temática indicada.
 
     Args:
-        ruta_base (str): Ruta base del proyecto (por ejemplo, D:\Requerimientos\TGI\AUTOMATIZACION_CARGUE_UPDM)
-        tematica (str): Nombre de la temática, p. ej. 'dcvg'
+        tematica (str): Nombre de la temática (por ejemplo, 'dcvg')
 
     Returns:
-        dict: Contenido del archivo JSON correspondiente
+        dict: Contenido del archivo JSON correspondiente o None si ocurre un error.
     """
-    ruta_json = os.path.join(ruta_base, "utils", "mapeos", f"{tematica}.json")
+    try:
+        # Obtener la ruta absoluta al directorio del script actual
+        base_dir = os.path.dirname(__file__)
+        ruta_json = os.path.join(base_dir, "mapeos", f"{tematica}.json")
 
-    if not os.path.exists(ruta_json):
-        raise FileNotFoundError(f"No se encontró el archivo JSON en: {ruta_json}")
+        if not os.path.exists(ruta_json):
+            raise FileNotFoundError(f"No se encontró el archivo JSON en: {ruta_json}")
 
-    with open(ruta_json, "r", encoding="utf-8") as archivo:
-        return json.load(archivo)
+        with open(ruta_json, "r", encoding="utf-8") as archivo:
+            mapeo = json.load(archivo)
+
+        arcpy.AddMessage(f"✅ Mapeo '{tematica}' cargado correctamente.")
+        return mapeo
+
+    except Exception as e:
+        arcpy.AddError(f"❌ Error al cargar el mapeo de la temática '{tematica}': {e}")
+        return None
 
 def generar_informe_validacion(df, mapeo_tematica):
     """

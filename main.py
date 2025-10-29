@@ -28,7 +28,7 @@ def main():
 
     # # --- 1️⃣ CARGAR MAPEO ---
     print("📘 [1/6] Cargando mapeo de temática...")
-    mapeo_tematica = cargar_mapeo_tematica(ruta_proyecto, tematica)
+    mapeo_tematica = cargar_mapeo_tematica(tematica)
     print("✅ Mapeo cargado correctamente.\n")
 
     # --- 2️⃣ VALIDACIÓN DEL EXCEL ---
