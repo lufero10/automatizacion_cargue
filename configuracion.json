@@ -1,0 +1,6 @@
+{
+    "ruta_sde": "D:\\Requerimientos\\TGI\\AUTOMATIZACION_CARGUE_UPDM\\sde\\TGI_UPDM.sde",
+    "ruta_mapeos": "mapeos",
+    "ruta_logs": "logs",
+    "temp_workspace": "scratch"
+}

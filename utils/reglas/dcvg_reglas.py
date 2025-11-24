@@ -88,17 +88,61 @@ def aplicar_reglas_dcvg(df):
     return df_agg
 
 def reglas_dcvg_secundario(df_secundario, CURRENT_USER, mapeo_tematica):
-    """Aplica las reglas específicas para la tabla secundaria de DCVG."""
+    """
+    Aplica las reglas específicas para la tabla secundaria de DCVG (P_DASurveyReadings_1).
+    Incluye:
+      - Asignación de campos de control (CREATIONDATE, UPDATEDBY, etc.)
+      - Conversiones de campos:
+          carácter_On_Off → CARON / CAROFF
+          CLASIFICACION → SEVERITYCLA
+    """
+    from datetime import datetime
+
+    # -------------------------------------------------
+    # 🕒 Asignar metadatos de control
+    # -------------------------------------------------
     fecha_cargue = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    df_secundario['FECHA_CARGUE'] = fecha_cargue
-    df_secundario['CREATIONDATE'] = fecha_cargue
-    df_secundario['LASTUPDATE'] = fecha_cargue
-    df_secundario['CREATOR'] = CURRENT_USER
-    df_secundario['UPDATEDBY'] = CURRENT_USER
-    df_secundario['DATYPE'] = mapeo_tematica.get("datype", "")
+    df_secundario["FECHA_CARGUE"] = fecha_cargue
+    df_secundario["CREATIONDATE"] = fecha_cargue
+    df_secundario["LASTUPDATE"] = fecha_cargue
+    df_secundario["CREATOR"] = CURRENT_USER
+    df_secundario["UPDATEDBY"] = CURRENT_USER
+    df_secundario["DATYPE"] = mapeo_tematica.get("datype", "")
+    df_secundario["DEPTHUNITS"] = 4
 
+    # -------------------------------------------------
+    # 🔄 Conversiones específicas DCVG secundario
+    # -------------------------------------------------
+
+    # 1️⃣ carácter_On_Off → CARON / CAROFF
+    col_onoff = next((c for c in df_secundario.columns if c.lower() in ["carácter_on_off", "caracter_on_off"]), None)
+    if col_onoff:
+        # Convertir valores a texto y limpiar nulos
+        valores = df_secundario[col_onoff].fillna("").astype(str).str.strip()
+
+        df_secundario["CARON"] = valores.str[0].map({"A": 1, "C": 2}).astype("Int64")
+        df_secundario["CAROFF"] = valores.str[1].map({"A": 1, "C": 2}).astype("Int64")
+
+    # 2️⃣ CLASIFICACION → SEVERITYCLA
+    mapa_clasificacion = {
+        "Muy Pequeño": 6,
+        "Pequeño": 1,
+        "Mediano": 2,
+        "Mediano-Grande": 3,
+        "Grande": 4
+    }
+
+    col_clas = next((c for c in df_secundario.columns if c.lower() == "clasificacion"), None)
+    if col_clas:
+        df_secundario["SEVERITYCLA"] = df_secundario[col_clas].map(mapa_clasificacion).astype("Int64")
+
+    # -------------------------------------------------
+    # ✅ Retornar DataFrame transformado
+    # -------------------------------------------------
     return df_secundario
+
+
 def aplicar_reglas_conversiones(df):
     """Aplica conversiones específicas para DCVG."""
     # Conversión de ENGM → ENGFROMM / ENGTOM

@@ -35,7 +35,7 @@ def cargar_mapeo_tematica(tematica):
     try:
         # Obtener la ruta absoluta al directorio del script actual
         base_dir = os.path.dirname(__file__)
-        ruta_json = os.path.join(base_dir, "mapeos", f"{tematica}.json")
+        ruta_json = os.path.join(base_dir, "../mapeos", f"{tematica}.json")
 
         if not os.path.exists(ruta_json):
             raise FileNotFoundError(f"No se encontró el archivo JSON en: {ruta_json}")

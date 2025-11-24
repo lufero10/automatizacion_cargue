@@ -1,12 +1,10 @@
-import os
 import pandas as pd
 import arcpy
 import pprint
 from utils.validacion import cargar_mapeo_tematica, generar_informe_validacion
 from utils.cargue_excel import cargar_excel_a_gdb
 from utils.alineacion import alineacion
-from utils.cargue_bd import cargue_bd
-from utils.reglas.dcvg_reglas import aplicar_reglas_dcvg
+from cargue_bd import cargue_bd
 
 
 def main():
@@ -14,7 +12,8 @@ def main():
     print("\n🧭 INICIANDO PROCESO AUTOMATIZADO DE CARGUE UPDM...\n")
 
     ruta_proyecto = r"D:\Requerimientos\TGI\AUTOMATIZACION_CARGUE_UPDM"
-    ruta_excel = os.path.join(ruta_proyecto, "DCVG_PPM_T_LBBR_10_24_1300010947_551003090_TEL_Rev0.xlsx")
+    #ruta_excel = os.path.join(ruta_proyecto, "DCVG_PPM_T_LBBR_10_24_1300010947_551003090_TEL_Rev0.xlsx")
+    ruta_excel = r"D:\Requerimientos\2025\Noviembre\6.1 DCVG 11.11.2025.xlsx"
     tematica = "dcvg"
     nombre_hoja = "DCVG"
     inputGeom = "Punto"  # "Punto" | "Linea"
@@ -34,6 +33,7 @@ def main():
     # --- 2️⃣ VALIDACIÓN DEL EXCEL ---
     print("📊 [2/6] Validando estructura del archivo Excel...")
     df = pd.read_excel(ruta_excel, sheet_name=nombre_hoja)
+    #df = pd.read_excel(ruta_excel)
     informe = generar_informe_validacion(df, mapeo_tematica)
     print("✅ Validación completada.\n")
 
@@ -56,13 +56,13 @@ def main():
     print("📐 [4/6] Ejecutando alineación con el Centerline...")
     if not arcpy.Exists(route):
         raise FileNotFoundError(f"❌ No se encontró la ruta del Centerline: {route}")
-
+    print("🪪 Campos del FC cargado:", [f.name for f in arcpy.ListFields(cobertura_fc)])
     alineacion(cobertura_fc, route, tolerancia)
     print("✅ Alineación completada correctamente.\n")
 
     # --- 5️⃣ CARGUE A BASE DE DATOS ---
     print("💾 [5/6] Iniciando cargue a base de datos destino...")
-    cobertura_fc = r"C:\Users\TICE21\AppData\Local\Temp\scratch.gdb\COBERTURA_FC"#Borrar
+    #cobertura_fc = r"C:\Users\TICE21\AppData\Local\Temp\scratch.gdb\COBERTURA_FC"#Borrar
 
     cargue_bd(cobertura_fc, tematica, mapeo_tematica, gdb_destino)
     print("✅ Cargue a base de datos completado.\n")

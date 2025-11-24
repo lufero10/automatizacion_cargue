@@ -4,6 +4,7 @@
   "datype": "Direct Current Voltage Gradient",
   "tabla_principal": {
     "nombre": "P_InspectionRange_1",
+    "tipo_espacial": "Linea Abscisado",
     "campos": {
       "ENGROUTEID": "ENGROUTEID",
       "No_Contrato": "CONTRACTNUMBER"
@@ -11,22 +12,24 @@
   },
   "tabla_secundaria": {
     "nombre": "P_DASurveyReadings_1",
+    "tipo_espacial": "Coordenadas XYZ",
     "campos": {
       "ENGROUTEID": "ENGROUTEID",
       "No_Contrato": "CONTRACTNUMBER",
       "Fecha_de_Inspección": "INSPECTIONDATE",
-      "ABCISA m": "FIELDM",
+      "ABCISA_m": "FIELDM",
       "Latitud": "GPSY",
       "Longitud": "GPSX",
       "Altitud": "GPSZ",
-      "P On mV": "PSON",
-      "P Off mV": "PSOFF",
-      "P_RE mV": "PREMV",
-      "OL_RE mV": "OLREMV",
+      "P_On_mV": "PSON",
+      "P_Off_mV": "PSOFF",
+      "P_RE_mV": "PREMV",
+      "OL_RE_mV": "OLREMV",
       "PORC_IR": "IRPERCENT",
-      "Cama anódica temporal": "TEMPANODEBED",
-      "Profundidad Tuberia m": "DEPTH",
-      "Comentarios": "COMMENTS"
+      "Cama_anódica_temporal": "TEMPANODEBED",
+      "Profundidad_Tuberia_m": "DEPTH",
+      "Comentarios": "COMMENTS",
+      "Inicio___Fin_de_Inspección": "Inicio_Fin_Inspec"
     }
   }
 }
