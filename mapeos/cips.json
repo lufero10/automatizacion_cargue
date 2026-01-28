@@ -1,0 +1,37 @@
+{
+    "tipo": "complejo",
+    "inspection_type": "CIPS",
+    "datype": "Close Interval Potential Survey",
+    "tabla_principal": {
+        "nombre": "P_InspectionRange_1",
+        "tipo_espacial": "Linea Abscisado",
+        "funcion_reglas": "reglas_cips_principal",
+        "campos": {
+            "ENGROUTEID": "ENGROUTEID",
+            "No_Contrato": "CONTRACTNUMBER"
+        }
+    },
+    "tabla_secundaria": {
+        "nombre": "P_DASurveyReadings_1",
+        "tipo_espacial": "Coordenadas XYZ",
+        "funcion_reglas": "reglas_cips_secundario",
+        "campos": {
+            "ENGROUTEID": "ENGROUTEID",
+            "No_Contrato": "CONTRACTNUMBER",
+            "Fecha_de_Inspección": "INSPECTIONDATE",
+            "ABCISA": "FIELDM",
+            "ENGM": "ENGM",
+            "Latitud": "GPSY",
+            "Longitud": "GPSX",
+            "Altitud": "GPSZ",
+            "P_On_mV": "PSON",
+            "P_Off_mV": "PSOFF",
+            "P_Natural_mV": "PSNATURAL",
+            "Polarizacion_mV": "DEPOLARIZEDPS",
+            "IR_On_mV": "IRON",
+            "IR_Off_mV": "IROFF",
+            "Dirección_de_la_inspección": "DIRECTION",
+            "Comentario": "COMMENTS"
+        }
+    }
+}

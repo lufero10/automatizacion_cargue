@@ -62,3 +62,10 @@ def cargar_excel_a_gdb(ruta_excel, nombre_hoja, outLocation, cobertura_fc, input
     return cobertura_fc
 
 
+# ruta_excel = r"D:\Requerimientos\2025\Noviembre\6.1 DCVG 11.11.2025.xlsx"
+# nombre_hoja = "DCVG"
+# inputGeom = "Punto"
+# outLocation = r"C:\Users\TICE21\OneDrive\Documentos\ArcGIS\Projects\TGI\TGI.gdb"
+# cobertura_name = "COBERTURA_FC"
+#
+# cargar_excel_a_gdb(ruta_excel, nombre_hoja, outLocation, cobertura_name, inputGeom)

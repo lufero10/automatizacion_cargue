@@ -5,6 +5,7 @@
   "tabla_principal": {
     "nombre": "P_InspectionRange_1",
     "tipo_espacial": "Linea Abscisado",
+    "funcion_reglas": "reglas_dcvg_principal",
     "campos": {
       "ENGROUTEID": "ENGROUTEID",
       "No_Contrato": "CONTRACTNUMBER"
@@ -13,11 +14,13 @@
   "tabla_secundaria": {
     "nombre": "P_DASurveyReadings_1",
     "tipo_espacial": "Coordenadas XYZ",
+    "funcion_reglas": "reglas_dcvg_secundario",
     "campos": {
       "ENGROUTEID": "ENGROUTEID",
       "No_Contrato": "CONTRACTNUMBER",
       "Fecha_de_Inspección": "INSPECTIONDATE",
       "ABCISA_m": "FIELDM",
+      "ENGM": "ENGM",
       "Latitud": "GPSY",
       "Longitud": "GPSX",
       "Altitud": "GPSZ",

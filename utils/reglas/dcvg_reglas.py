@@ -2,10 +2,11 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
-def aplicar_reglas_dcvg(df):
+
+def reglas_dcvg_principal(df, CURRENT_USER, mapeo_tematica):
     """
-    Aplica las reglas específicas de la temática DCVG al DataFrame.
-    Convierte, agrega y duplica columnas según la lógica original de DCVG.
+    Aplica las reglas específicas de la temática DCVG al DataFrame (agregación min/max).
+    Acepta 3 argumentos para mantener la firma unificada con la secundaria.
     """
     if df.empty:
         return df
@@ -28,7 +29,7 @@ def aplicar_reglas_dcvg(df):
     }
 
     # -------------------------------------------------
-    # Preparación de las reglas para pandas
+    # Preparación de las reglas para pandas (MISMA LÓGICA)
     reglas_agg = {}
     duplicados = {}
     for columna, operaciones in reglas_conversion.items():
@@ -74,16 +75,18 @@ def aplicar_reglas_dcvg(df):
                 df_agg[nueva] = df_agg[col_origen]
 
     # -------------------------------------------------
-    # Columnas adicionales de fecha y control
+    # Columnas adicionales de fecha y control (USANDO ARGUMENTOS DINÁMICOS)
     from datetime import datetime
     fecha_cargue = datetime.now().strftime("%Y-%m-%d %H:%M")
     df_agg['FECHA_CARGUE'] = fecha_cargue
     df_agg['CREATIONDATE'] = fecha_cargue
     df_agg['LASTUPDATE'] = fecha_cargue
-    df_agg['CREATOR'] = 'usuario_pruebas'
-    df_agg['UPDATEDBY'] = 'usuario_pruebas'
-    df_agg['INSPECTIONTYPE'] = "DCVG"
-    df_agg['DATYPE'] = "Direct Current Voltage Gradient"
+
+    # 🔑 USO CLAVE: Usar CURRENT_USER y mapeo_tematica
+    df_agg['CREATOR'] = CURRENT_USER
+    df_agg['UPDATEDBY'] = CURRENT_USER
+    df_agg['INSPECTIONTYPE'] = mapeo_tematica.get("inspection_type", "DCVG")
+    df_agg['DATYPE'] = mapeo_tematica.get("datype", "Direct Current Voltage Gradient")
 
     return df_agg
 
@@ -194,3 +197,15 @@ def validar_datos(df):
         print("✅ Validaciones DCVG superadas correctamente.")
 
     return df
+
+
+# # --------------------------------------------------------------------------------------
+# #  DICCIONARIO DE CATÁLOGO (EL CAMBIO CLAVE PARA LA INVOCACIÓN UNIFICADA)
+# # --------------------------------------------------------------------------------------
+# REGLAS_TEMATICA = {
+#     # Coincide con la clave del JSON para la principal
+#     "reglas_dcvg_principal": reglas_dcvg_principal,
+#
+#     # Coincide con la clave del JSON para la secundaria
+#     "reglas_dcvg_secundario": reglas_dcvg_secundario,
+# }

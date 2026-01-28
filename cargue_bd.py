@@ -5,9 +5,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 from utils.espacializaciontematica import espacializacion
-
-# Importar reglas por temática
-from utils.reglas.dcvg_reglas import aplicar_reglas_dcvg, reglas_dcvg_secundario
+#from utils.reglas.dcvg_reglas import REGLAS_TEMATICA
+from utils.reglas.reglas_tematicas import REGLAS_TEMATICA
 
 # -------------------------------------------------------------------
 # 🗂️ Geodatabase temporal de trabajo
@@ -92,14 +91,26 @@ def cargar_df_a_tabla(df, gdb_destino, nombre_tabla):
     # ---------------------------------------------------------
     # 💾 Insertar filas del DataFrame en la tabla
     # ---------------------------------------------------------
-    campos_insertar = [c for c in df.columns if c.upper() not in ["OBJECTID", "SHAPE", "SHAPE_LENGTH", "SHAPE_AREA"]]
+    campos_reservados = ["OBJECTID", "SHAPE", "SHAPE_LENGTH", "SHAPE_AREA"]
+    # 1. Definir la lista de campos a insertar (solo campos válidos)
+    campos_insertar = [c for c in df.columns if c.upper() not in campos_reservados]
     print(f"📥 Insertando {len(df)} registros en {nombre_tabla}...")
 
+    # 2. Slice the DataFrame to match the insertion fields EXACTLY
+    df_a_insertar = df[campos_insertar]  # <--- Esto asegura que el orden es correcto
+
     with arcpy.da.InsertCursor(tabla_destino, campos_insertar) as cursor:
-        for i, (_, row) in enumerate(df[campos_insertar].iterrows(), start=1):
+        # Iterar sobre las filas del DataFrame ya filtrado
+        for i, row in enumerate(df_a_insertar.itertuples(index=False), start=1):
             try:
-                cursor.insertRow(row)
+                # Convertir el NamedTuple de itertuples a una lista de Python simple
+                cursor.insertRow(list(row))
             except Exception as e:
+                # Si el error es el de tamaño, imprimir la lista de campos y la longitud de la fila
+                if "fields size must match size of the row" in str(e):
+                    print(f"⚠️ ERROR DE TAMAÑO EN FILA {i}:")
+                    print(f"   Campos esperados por ArcPy: {len(campos_insertar)}")
+                    print(f"   Campos de la fila de Pandas: {len(row)}")
                 print(f"⚠️ Error al insertar fila {i}: {e}")
 
     print(f"✅ Tabla '{nombre_tabla}' creada y cargada correctamente.")
@@ -143,16 +154,10 @@ def asignar_globalid(df_secundario, cobdestino, inspection_type_json, fecha_carg
     return df_secundario
 
 
-# Diccionario para seleccionar la función de reglas según temática
-REGLAS_TEMATICA = {
-    "dcvg": aplicar_reglas_dcvg
-    # "otra_tematica": aplicar_reglas_otra,
-}
-
 def cargue_bd(fc, tematica, mapeo_tematica, gdb_destino):
     """
     Carga información desde un feature class (fc) a las tablas destino (Principal y Secundaria)
-    usando la configuración de mapeo JSON proporcionada.
+    usando la configuración de mapeo JSON proporcionada, con invocación de reglas unificada.
     """
 
     print("🔎 Iniciando cargue a BD...")
@@ -165,13 +170,23 @@ def cargue_bd(fc, tematica, mapeo_tematica, gdb_destino):
 
     # --- 1. CONFIGURACIÓN ÚNICA Y EXTRACCIÓN (E) ---
 
-    # Propiedades de la GDB Empresarial (SDE) - Se asume que GDB_UPDM es constante.
+    # Propiedades de la GDB Empresarial (SDE)
     GDB_UPDM = r"D:\Requerimientos\TGI\AUTOMATIZACION_CARGUE_UPDM\sde\TGI_UPDM.sde"
-    DESC = arcpy.Describe(GDB_UPDM)
-    CP = DESC.connectionProperties
+    # --- Sección de conexión en cargue_bd.py ---
+    DESC = arcpy.Describe(gdb_destino)  # Usamos el destino que entra por parámetro
     TIPO_DB = DESC.workspaceType
-    NOMBRE_DB_PREFIX = CP.database + ".DBO." if TIPO_DB == "RemoteDatabase" else ""
-    CURRENT_USER = CP.user
+
+    if TIPO_DB == "RemoteDatabase":
+        # Solo las SDE tienen connectionProperties
+        CP = DESC.connectionProperties
+        DB_NAME = getattr(CP, 'database', '')
+        NOMBRE_DB_PREFIX = f"{DB_NAME}.DBO." if DB_NAME else "DBO."
+        CURRENT_USER = getattr(CP, 'user', 'Unknown')
+    else:
+        # Si es File GDB local (como la de tu log), no hay prefijos de servidor
+        NOMBRE_DB_PREFIX = ""
+        CURRENT_USER = "LocalUser"
+        arcpy.AddMessage("ℹ️ Destino detectado como GDB Local. Omitiendo propiedades de conexión SDE.")
 
     # Cargar Feature Class ÚNICO a DataFrame
     try:
@@ -184,7 +199,6 @@ def cargue_bd(fc, tematica, mapeo_tematica, gdb_destino):
 
     # --- 2. DEFINICIÓN DINÁMICA DE COMPONENTES ---
 
-    # Se usa el JSON para definir la lista de trabajo
     componentes = [
         {"nombre_logico": "Tabla Principal", "config": mapeo_tematica["tabla_principal"], "es_principal": True},
         {"nombre_logico": "Tabla Secundaria", "config": mapeo_tematica["tabla_secundaria"], "es_principal": False}
@@ -192,28 +206,27 @@ def cargue_bd(fc, tematica, mapeo_tematica, gdb_destino):
 
     # --- 3. PROCESO ETL Y ESPACIALIZACIÓN ITERATIVO ---
 
-    # Variables de Espacialización (Constantes para la temática DCVG):
+    # Variables de Espacialización (Constantes)
     campo_engrid = 'ENGROUTEID'
     centerline = os.path.join(gdb_destino, "P_centerline")
     campo_routeid = 'ENGROUTEID'
-    # Cadena WKT del SR
     sr = 'GEOGCS["GCS_MAGNA",DATUM["D_MAGNA",SPHEROID["GRS_1980",6378137.0,298.257222101]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]];-400 -400 1000000000;-100000 10000;-100000 1000;8.98315284119521E-09;0.001;0.002;IsHighPrecision'
 
-    cobdestino_principal = None  # Se usa para pasar el destino de la principal a la secundaria (GLOBALID)
+    cobdestino_principal = None
 
     for comp in componentes:
         nombre_logico = comp["nombre_logico"]
 
-        # Extracción de la configuración del JSON, incluyendo el tipo_espacial:
+        # Extracción de la configuración del JSON
         nombre_tabla_fc = comp["config"]["nombre"]
         mapeo_campos = comp["config"]["campos"]
         es_principal = comp["es_principal"]
-        # LEER DIRECTAMENTE DEL JSON AJUSTADO
         tipo_espacial = comp["config"].get("tipo_espacial")
+        nombre_funcion_reglas = comp["config"].get("funcion_reglas")
 
-        if not tipo_espacial:
-            print(f"❌ Error: 'tipo_espacial' no encontrado en la configuración de {nombre_logico}.")
-            continue  # Saltar este componente si la configuración es incorrecta
+        if not tipo_espacial or not nombre_funcion_reglas:
+            print(f"❌ Error: Configuración incompleta en {nombre_logico}. Faltan 'tipo_espacial' o 'funcion_reglas'.")
+            continue
 
         print(f"\n--- 🔄 Procesando {nombre_logico}: {nombre_tabla_fc} ---")
 
@@ -221,40 +234,61 @@ def cargue_bd(fc, tematica, mapeo_tematica, gdb_destino):
         df_componente = df_origen.copy()
         df_componente.rename(columns=mapeo_campos, inplace=True)
 
-        # 3.2. Aplicar Reglas
-        if es_principal:
-            funcion_reglas = REGLAS_TEMATICA.get(tematica)
-            if funcion_reglas:
-                df_componente = funcion_reglas(df_componente)
-        else:
-            # Lógica Específica Secundaria: Reglas y Asignación de GLOBALID
-            df_componente = reglas_dcvg_secundario(df_componente, CURRENT_USER, mapeo_tematica)
+        # -------------------------------------------------------------
+        # 3.2. Aplicar Reglas (Lógica UNIFICADA por JSON)
+        # -------------------------------------------------------------
 
-            # Asignación de GLOBALID:
-            inspection_type_json = mapeo_tematica.get("inspection_type", "DCVG")
-            if cobdestino_principal:
-                df_componente = asignar_globalid(df_componente, cobdestino_principal, inspection_type_json)
-            else:
-                print("⚠️ ERROR: No se encontró el destino de la tabla principal para asignar GLOBALID.")
+        # Buscar la función en el catálogo importado
+        funcion_reglas = REGLAS_TEMATICA.get(nombre_funcion_reglas)
+
+        if funcion_reglas:
+            print(f"   Aplicando reglas: {nombre_funcion_reglas}...")
+
+            # Ejecución unificada: Pasa los tres argumentos (df, CURRENT_USER, mapeo_tematica)
+            df_componente = funcion_reglas(df_componente, CURRENT_USER, mapeo_tematica)
+
+            ############################PRUEBAS############################
+
+            # 🚀 PUNTO DE INSPECCIÓN CRÍTICO AÑADIDO AQUÍ 🚀
+            print("\n--- 🔎 DIAGNÓSTICO: COLUMNAS DEL DATAFRAME DESPUÉS DE REGLAS ---")
+            print("Total de columnas:", len(df_componente.columns))
+            print("Nombres de columnas:", list(df_componente.columns))
+            print("-------------------------------------------------------------------\n")
+            # ---------------------------------------------------------------------------
+
+
+
+
+
+            # --- Lógica de RELACIÓN (GLOBALID) ---
+            # Este paso es exclusivo de la tabla Secundaria y se ejecuta DESPUÉS de sus reglas.
+            if not es_principal:
+                inspection_type_json = mapeo_tematica.get("inspection_type")
+                if cobdestino_principal:
+                    # La función asignar_globalid requiere el destino de la tabla principal.
+                    df_componente = asignar_globalid(df_componente, cobdestino_principal, inspection_type_json)
+                else:
+                    print(
+                        "⚠️ ERROR: No se encontró el destino principal para asignar GLOBALID. Imposible crear relación.")
+        else:
+            print(f"⚠️ No se encontró función de reglas para '{nombre_funcion_reglas}' en REGLAS_TEMATICA.")
 
         # 3.3. Carga (L) a Tabla
         cargar_df_a_tabla(df_componente, gdb_destino, nombre_tabla_fc)
         print(f"✅ {nombre_logico} cargada correctamente en GDB temporal.")
 
         # 3.4. Espacialización
-
         ft = os.path.join(gdb_destino, nombre_tabla_fc)
         out_fc = os.path.join(gdb_destino, f"{nombre_tabla_fc}_Espacializada")
-        # Generación del destino en SDE
         cobdestino = os.path.join(GDB_UPDM, f"{NOMBRE_DB_PREFIX}P_Integrity", nombre_tabla_fc)
 
-        # Guardar el cobdestino de la principal para uso de la secundaria
+        # Almacenar el destino de la principal para el paso 3.2.
         if es_principal:
             cobdestino_principal = cobdestino
 
         espacializacion(
             ft, campo_engrid, out_fc, centerline, campo_routeid,
-            tipo_espacial, sr, cobdestino  # <--- Uso de tipo_espacial dinámico
+            tipo_espacial, sr, cobdestino
         )
         print(f"✨ Espacialización de {nombre_logico} finalizada e insertada en SDE.")
 

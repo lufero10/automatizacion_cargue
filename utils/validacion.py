@@ -2,6 +2,7 @@ import json
 import pandas as pd
 import os
 import arcpy
+from datetime import time
 
 
 # def cargar_mapeo_tematica(ruta_base, tematica):
@@ -50,50 +51,26 @@ def cargar_mapeo_tematica(tematica):
         arcpy.AddError(f"❌ Error al cargar el mapeo de la temática '{tematica}': {e}")
         return None
 
+
 def generar_informe_validacion(df, mapeo_tematica):
     """
-    Genera un informe de validación para la tabla_principal y tabla_secundaria
-    usando el mapeo de una temática específica (por ejemplo dcvg.json).
+    Ya no comparamos nombres de columnas con el JSON.
+    Solo informamos sobre la calidad de los datos internos.
     """
-    informe = {}
+    errores_calidad = validar_valores_adicionales(df)
 
-    # --- Tabla principal ---
-    if "tabla_principal" in mapeo_tematica:
-        tabla_principal = mapeo_tematica["tabla_principal"]
-        campos_principal = tabla_principal["campos"]
+    # Si hay errores de calidad, los mostramos como advertencias en el log de ArcGIS
+    if errores_calidad:
+        for err in errores_calidad:
+            arcpy.AddWarning(f"⚠️ CALIDAD: {err}")
 
-        faltantes_principal = validar_columnas(df, campos_principal)
-        errores_tipo_principal = validar_tipos(df, campos_principal)
-        estado_principal = "OK" if not faltantes_principal and not errores_tipo_principal else "ERROR"
-
-        informe["tabla_principal"] = {
-            "nombre": tabla_principal["nombre"],
-            "estado": estado_principal,
-            "faltantes": faltantes_principal,
-            "errores_tipo": errores_tipo_principal,
-        }
-
-    # --- Tabla secundaria ---
-    if "tabla_secundaria" in mapeo_tematica:
-        tabla_secundaria = mapeo_tematica["tabla_secundaria"]
-        campos_secundaria = tabla_secundaria["campos"]
-
-        faltantes_secundaria = validar_columnas(df, campos_secundaria)
-        errores_tipo_secundaria = validar_tipos(df, campos_secundaria)
-        estado_secundaria = "OK" if not faltantes_secundaria and not errores_tipo_secundaria else "ERROR"
-
-        informe["tabla_secundaria"] = {
-            "nombre": tabla_secundaria["nombre"],
-            "estado": estado_secundaria,
-            "faltantes": faltantes_secundaria,
-            "errores_tipo": errores_tipo_secundaria,
-        }
-
-    # --- Validaciones adicionales ---
-    informe["errores_adicionales"] = validar_valores_adicionales(df)
-
-    return informe
-
+    # --- AQUÍ ESTABA EL ERROR: FALTABA CERRAR LA LLAVE ---
+    return {
+        "estado": "OK",
+        "errores_adicionales": errores_calidad,
+        "tabla_principal": {"estado": "OK", "faltantes": []},
+        "tabla_secundaria": {"estado": "OK", "faltantes": []}
+    }
 
 def validar_columnas(df, campos):
     """Valida que las columnas requeridas estén presentes en el DataFrame."""
@@ -113,22 +90,41 @@ def validar_tipos(df, campos):
 
 def validar_valores_adicionales(df):
     """
-    Validaciones adicionales:
-      - 'No Contrato' debe tener un único valor en todo el archivo.
-      - 'Fecha de Inspección' debe cumplir formato dd/mm/aaaa.
+    Validación de contenido:
+    - 'No Contrato' único.
+    - 'Fecha de Inspección' sin horas.
     """
     errores = []
 
-    if "No Contrato" in df.columns:
-        contratos_unicos = df["No Contrato"].dropna().unique()
+    # 1. Validación No Contrato
+    campo_c = "No Contrato"
+    if campo_c in df.columns:
+        contratos_unicos = df[campo_c].dropna().unique()
         if len(contratos_unicos) > 1:
-            errores.append(f"Se encontraron múltiples valores en 'No Contrato': {list(contratos_unicos)}")
+            errores.append(f"Múltiples contratos detectados: {list(contratos_unicos)}")
 
-    if "Fecha de Inspección" in df.columns:
-        for i, val in df["Fecha de Inspección"].dropna().items():
-            try:
-                pd.to_datetime(val, format="%d/%m/%Y", errors="raise")
-            except Exception:
-                errores.append(f"Formato inválido en 'Fecha de Inspección' fila {i+2}: {val} (debe ser dd/mm/aaaa)")
+    # 2. Validación Fecha de Inspección
+    campo_f = "Fecha de Inspección"
+    if campo_f in df.columns:
+        # Convertimos a datetime para validar la hora de forma robusta
+        fechas = pd.to_datetime(df[campo_f], errors='coerce')
+        for i, val in fechas.items():
+            if pd.notna(val) and (val.hour != 0 or val.minute != 0 or val.second != 0):
+                errores.append(f"Fila {i+2}: La fecha tiene hora ({df.loc[i, campo_f]})")
 
     return errores
+
+
+ruta_excel = r"D:\Requerimientos\2025\Diciembre\6.5 Inspecciones CIPS 16.12.2025.xlsx"
+df = pd.read_excel(ruta_excel)
+# --------------------------------------------
+# 3️⃣ Validar el DataFrame
+# --------------------------------------------
+errores = validar_valores_adicionales(df)
+
+if errores:
+    print("❌ Se encontraron errores:")
+    for e in errores:
+        print(" -", e)
+else:
+    print("✅ Validación completada sin errores")

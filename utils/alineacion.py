@@ -22,7 +22,8 @@ def alineacion(cobertura, route, tolerancia):
     oid_field = arcpy.Describe(cobertura).OIDFieldName
 
     # Paths temporales en scratch GDB
-    GDB = arcpy.env.scratchGDB
+    #GDB = arcpy.env.scratchGDB
+    GDB = r"C:\Users\TICE21\OneDrive\Documentos\ArcGIS\Projects\TGI\TGI.gdb"
     coberturasel = os.path.join(GDB, "COBERTURA")
     coberturavertices = os.path.join(GDB, "VERTICES")
     routesel = os.path.join(GDB, "ROUTE_SEL")
